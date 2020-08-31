@@ -352,6 +352,7 @@ select_values_for_plot <- function(values_for_plot) {
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
+    dir.create('data',showWarnings = F)
     download_pt_polls()
     values <- reactiveValues()
     values$dt <- data.frame(
