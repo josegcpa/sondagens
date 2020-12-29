@@ -5,6 +5,7 @@ library(shinyBS)
 library(cowplot)
 library(dlm)
 library(tseries)
+library(streamgraph)
 
 PALETTE <- c("#332288","#6699CC","#88CCEE","#44AA99","#117733",
              "#999933","#DDCC77","#661100","#CC6677","#AA4466",
@@ -45,8 +46,8 @@ load_pt_polls <- function() {
         mutate(Proporção = gsub('%','',Proporção) %>% 
                    as.character %>%
                    as.numeric) %>%
-        mutate(Proporção = Proporção / 100) %>% 
-        return
+        mutate(Proporção = Proporção / 100)
+    return(tmp)
 }
 
 kalman_filter <- function(values,dates) {
@@ -117,6 +118,7 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
         poll_plot <- poll_plot + 
             scale_y_continuous(trans='log10')
     }
+    
     poll_plot_all <- values_for_plot %>% 
         subset(!is.na(Proporção)) %>% 
         ggplot(aes(x = Data,y = Proporção,
@@ -219,10 +221,17 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
         xlab("Sondagens") + 
         ylab("Variação")
     
+    poll_plot_streamgraph <- streamgraph(values_for_plot,
+                                         "Partido","Proporção", "Data", 
+                                         interactive=TRUE) %>% 
+        sg_axis_x(4, "month","%b\n%Y") %>% 
+        sg_fill_manual(values = PALETTE)
+    
     return(list(poll_plot = poll_plot,
                 poll_plot_all = poll_plot_all,
                 poll_plot_bars = poll_plot_bars,
-                poll_plot_variations = poll_plot_variations))
+                poll_plot_variations = poll_plot_variations,
+                poll_plot_streamgraph = poll_plot_streamgraph))
 }
 
 make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
@@ -240,10 +249,13 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
         )) %>% 
         mutate(Significante = ifelse(p.val.prev < 0.05,"Sim","Não")) %>%
         mutate(Significante = ifelse(is.na(Significante),"Não",Significante))
+
     smooth_values_for_plot <- lapply(
         unique(values_for_plot$Partido),
         FUN = function(x) {
-            tmp <- values_for_plot %>% subset(Partido == x)
+            tmp <- values_for_plot %>% 
+                subset(Partido == x) %>%
+                subset(!is.na(Proporção))
             values <- tmp$Proporção
             dates <- tmp$Data
             smooth_values <- kalman_filter(values,dates)
@@ -253,21 +265,20 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
                 Partido = x
             ) %>%
                 mutate(Data = as.Date(Data)) %>% 
-                filter(Data >= min(tmp$Data)) %>% 
+                subset(Data >= min(tmp$Data)) %>% 
                 return
         }) %>%
         do.call(what = rbind) %>%
         as.data.frame() %>%
-        mutate(Data = as.Date(Data)) %>%
-        na.omit()
+        mutate(Data = as.Date(Data))
     
     poll_plot <- values_for_plot %>% 
         subset(!is.na(Proporção)) %>% 
         ggplot(aes(x = Data,y = Proporção,
                    colour = Partido,fill = Partido,
                    group = Partido)) + 
-        geom_point(size = 0.4,aes(shape = Significante),alpha = 0.4) + 
-        geom_line(size = 0.2,
+        geom_point(size = 0.4,aes(shape = Significante),alpha = 0.45) + 
+        geom_line(size = 0.4,
                   data = smooth_values_for_plot,
                   inherit.aes = F,
                   aes(x = Data,
@@ -294,8 +305,8 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
         ggplot(aes(x = Data,y = Proporção,
                    colour = Partido,fill = Partido,
                    group = Partido)) + 
-        geom_point(size = 0.4,aes(shape = Significante),alpha = 0.4) + 
-        geom_line(size = 0.2,
+        geom_point(size = 0.5,aes(shape = Significante),alpha = 0.4) + 
+        geom_line(size = 0.6,
                   data = smooth_values_for_plot,
                   inherit.aes = F,
                   aes(x = Data,
@@ -323,8 +334,15 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
                                rel_heights = c(0.9,0.1),
                                ncol=1)
     
+    poll_plot_streamgraph <- streamgraph(smooth_values_for_plot,
+                                         "Partido","SmoothValues", "Data", 
+                                         interactive=TRUE) %>% 
+        sg_axis_x(4, "month","%b\n%Y") %>% 
+        sg_fill_manual(values = PALETTE)
+    
     return(list(poll_plot = poll_plot,
                 poll_plot_all = poll_plot_all,
+                poll_plot_streamgraph = poll_plot_streamgraph,
                 data = smooth_values_for_plot))
 }
 
@@ -350,8 +368,37 @@ select_values_for_plot <- function(values_for_plot) {
     return(values_for_plot)
 }
 
+calculate_error <- function(P,N,C = 0.95) {
+    O <- qnorm(C) * sqrt(P * (1-P)/N)
+    print(O)
+    return(O)
+}
+
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
+    
+    observeEvent(
+        input$calc_proportion | input$calc_sample_size | input$calc_confidence,
+        {
+            err <- calculate_error(input$calc_proportion/100,
+                                   input$calc_sample_size,
+                                   input$calc_confidence/100)
+            output_table <- data.frame(
+                A = sprintf("%.2f%%",err * 100),
+                B = max(sprintf("%.2f%%",input$calc_proportion - err * 100),0),
+                C = max(0,sprintf("%.2f%%",input$calc_proportion + err * 100))
+            )
+            colnames(output_table) <- c(
+                "Erro",
+                "Intervalo (mínimo)",
+                "Intervalo (máximo)"
+            )
+            output$calc_output <- renderTable(
+                output_table
+            )
+        }
+    )
+    
     dir.create('data',showWarnings = F)
     download_pt_polls()
     values <- reactiveValues()
@@ -365,7 +412,6 @@ shinyServer(function(input, output) {
         Máximo = numeric(0),
         Erro = numeric(0)
     )
-    
     df <- load_pt_polls() %>% 
         mutate(Erro = round(qnorm(0.95)*sqrt(Proporção*(1-Proporção)/Total),3)) %>%
         mutate(Mínimo = Proporção - Erro) %>%
@@ -373,9 +419,7 @@ shinyServer(function(input, output) {
         select(
             Partido,Total,Data,Sondagem,Proporção,Mínimo,Máximo,Erro
         )
-    
     isolate(values$dt <- bind_rows(values$dt,df))
-    
     isolate({
         values_for_plot <- values$dt %>% 
             mutate(Data = as.Date(Data),
@@ -522,6 +566,8 @@ shinyServer(function(input, output) {
                         plots$poll_plot_all,
                         res = RES,
                         height = heights$poll_plot_all)
+                    output$poll_plot_streamgraph <- renderStreamgraph(
+                        plots$poll_plot_streamgraph)
                 } else {
                     smooth_plots <- make_plots_smooth(
                         values_for_plot,input$log_plot,input$log_plot_all)
@@ -533,6 +579,8 @@ shinyServer(function(input, output) {
                         smooth_plots$poll_plot_all,
                         res = RES,
                         height = heights$poll_plot_all)
+                    output$poll_plot_streamgraph <- renderStreamgraph(
+                        smooth_plots$poll_plot_streamgraph)
                 }
             } else {
 
