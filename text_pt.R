@@ -12,7 +12,39 @@ website_legends  <- list(
   add_data_manual = "Acrescentar dados (manual)",
   streamgraph = "Gráfico de fluxo",
   calculate_error = "Calcular a margem de erro",
-  compare_proportions = "Comparar proporções")
+  compare_proportions = "Comparar proporções",
+  title = "São sondagens, senhor",
+  political_party = "Partido político",
+  proportion = "Proporção",
+  polled_total = "Total de sondados",
+  date = "Data",
+  poll_id = "Sondagem",
+  add = "Acrescentar",
+  delete_rows_comma_separated = "Linhas a apagar (separadas por vírgulas)",
+  delete = "Apagar",
+  delete_all = "Apagar tudo",
+  download_data_title = "Download dos dados",
+  simplified = "Simplificado",
+  error_calculated = "Com erros calculados",
+  complete = "Completo",
+  confidence = "Confiança",
+  confidence_for_ci = "Confiança (para o CI)",
+  approximation_kalman = "Aproximação (filtro de Kalman)",
+  activate_visualization_kalman = "Ativar visualização",
+  help = "Ajuda",
+  statistical_significance = "Significância estatística?",
+  intervals_and_confidence = "Intervalos e confiança - mas porquê?",
+  proportion_percent = "Proporção (%)",
+  sample_size = "Tamanho da amostra",
+  confidence_percent = "Confiança (%)",
+  proportion_1_percent = "Proporção 1 (%)",
+  proportion_1_percent = "Proporção 2 (%)",
+  yes = "Sim",
+  no = "Não",
+  error = "Erro",
+  interval_minimum = "Intervalo (mínimo)",
+  interval_maximum = "Intervalo (máximo)",
+  variation = "Variação")
 
 website_explanations <- list()
 
@@ -106,3 +138,16 @@ website_explanations$intervals_text <- p(
 website_explanations$calculate_error <- p(
   "Calcula o erro para um dado tamanho de amostra e e uma dada proporção."
 )
+
+website_explanations$compare_proportions <- p(
+  "A diferença entre as duas probabilidades tem significância estatística se o valor-p ",
+  " for inferior a 0.05 ou o intervalo da diferença das proporções não contiver o 0. ",
+  "Este teste não é válido para amostras pequenas (<30).")
+
+website_explanations$is_change_significant <- "A mudança para este valor é estatisticamente significante?"
+
+website_explanations$party_progress <- "Progresso dos partidos para cada sondagem"
+
+website_explanations$compare_parties <- "Comparação entre partidos por sondagem"
+
+website_explanations$variation_observed <- "Variação observada entre sondagens"

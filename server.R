@@ -7,6 +7,8 @@ library(dlm)
 library(tseries)
 library(streamgraph)
 
+source("text_pt.R")
+
 PALETTE <- c("#332288","#6699CC","#88CCEE","#44AA99","#117733",
              "#999933","#DDCC77","#661100","#CC6677","#AA4466",
              "#882255","#AA4499")
@@ -26,6 +28,11 @@ CONVERSION_LIST <- list(
     Other = 'Outros'
 )
 
+yes_no_list <- list(Sim = 17,Não = 16)
+names(yes_no_list) <- c(
+    website_legends$yes,
+    website_legends$no
+)
 
 download_pt_polls <- function() {
     data_url <- 'https://filipvanlaenen.github.io/eopaod/pt.csv'
@@ -34,19 +41,19 @@ download_pt_polls <- function() {
 
 load_pt_polls <- function() {
     tmp <- read.csv("data/pt.csv") %>%
-        gather(key = "Partido",value = "Proporção",names(CONVERSION_LIST)) %>%
+        gather(key = "PoliticalParty",value = "Proportion",names(CONVERSION_LIST)) %>%
         select(
-            Partido = Partido,
+            PoliticalParty = PoliticalParty,
             Total = Sample.Size,
-            Data = Fieldwork.End,
-            Proporção = Proporção,
-            Sondagem = Polling.Firm
+            Date = Fieldwork.End,
+            Proportion = Proportion,
+            PollID = Polling.Firm
             ) %>%
-        mutate(Partido = unlist(CONVERSION_LIST[Partido])) %>%
-        mutate(Proporção = gsub('%','',Proporção) %>% 
+        mutate(PoliticalParty = unlist(CONVERSION_LIST[PoliticalParty])) %>%
+        mutate(Proportion = gsub('%','',Proportion) %>% 
                    as.character %>%
                    as.numeric) %>%
-        mutate(Proporção = Proporção / 100)
+        mutate(Proportion = Proportion / 100)
     return(tmp)
 }
 
@@ -81,62 +88,68 @@ statistical_test <- function(p1,p2,n1,n2) {
 
 make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
     values_for_plot <- values_for_plot %>%
-        group_by(Partido) %>% 
-        arrange(Partido,Data) %>% 
-        mutate(PrevP = c(NA,Proporção[-length(Proporção)]),
+        group_by(PoliticalParty) %>% 
+        arrange(PoliticalParty,Date) %>% 
+        mutate(PrevP = c(NA,Proportion[-length(Proportion)]),
                PrevT = c(NA,Total[-length(Total)])) %>% 
         rowwise() %>%
         mutate(p.val.prev = statistical_test(
-            Proporção,
+            Proportion,
             PrevP,
             Total,
             PrevT
         )) %>% 
-        mutate(Significante = ifelse(p.val.prev < 0.05,"Sim","Não")) %>%
-        mutate(Significante = ifelse(is.na(Significante),"Não",Significante))
+        mutate(Significante = ifelse(p.val.prev < 0.05,website_legends$yes,website_legends$no)) %>%
+        mutate(Significante = ifelse(is.na(Significante),website_legends$no,Significante))
     poll_plot <- values_for_plot %>% 
-        subset(!is.na(Proporção)) %>% 
-        ggplot(aes(x = Data,y = Proporção,
-                   ymin = Mínimo,ymax = Máximo,
-                   colour = Partido,fill = Partido,
+        subset(!is.na(Proportion)) %>% 
+        ggplot(aes(x = Date,y = Proportion,
+                   ymin = Minimum,ymax = Maximum,
+                   colour = PoliticalParty,fill = PoliticalParty,
                    shape = Significante,
-                   group = Partido)) + 
+                   group = PoliticalParty)) + 
         geom_point(size = 0.4) + 
         geom_line(size = 0.2) +
         geom_ribbon(alpha = 0.3,color = NA) +
-        facet_wrap(~ Partido,ncol = 3) + 
+        facet_wrap(~ PoliticalParty,ncol = 3) + 
         theme_minimal(base_size = 7) + 
         scale_colour_manual(values = PALETTE,guide=F) + 
         scale_fill_manual(values = PALETTE,guide=F) + 
-        scale_shape_manual(values = list(Sim = 17,Não = 16),
-                           name = "A mudança para este valor é estatisticamente significante?") +
+        scale_shape_manual(values = yes_no_list,
+                           name = website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
-        ggtitle("Progresso dos partidos para cada sondagem") + 
+        ggtitle(website_explanations$party_progress) + 
         theme(legend.position = "bottom",
-              panel.grid.minor.y = element_blank())
+              panel.grid.minor.y = element_blank()) +
+        xlab(website_legends$date) + 
+        ylab(website_legends$proportion)
+    
     if (log_plot == T) {
         poll_plot <- poll_plot + 
             scale_y_continuous(trans='log10')
     }
-    
+
     poll_plot_all <- values_for_plot %>% 
-        subset(!is.na(Proporção)) %>% 
-        ggplot(aes(x = Data,y = Proporção,
-                   ymin = Mínimo,ymax = Máximo,
-                   colour = Partido,fill = Partido,
+        subset(!is.na(Proportion)) %>% 
+        ggplot(aes(x = Date,y = Proportion,
+                   ymin = Minimum,ymax = Maximum,
+                   colour = PoliticalParty,fill = PoliticalParty,
                    shape = Significante,
-                   group = Partido)) + 
+                   group = PoliticalParty)) + 
         geom_point(size = 0.8) + 
         geom_line(size = 0.3) +
         geom_ribbon(alpha = 0.2,color = NA) +
         theme_minimal(base_size = 7) + 
         scale_colour_manual(values = PALETTE,name = NULL) + 
         scale_fill_manual(values = PALETTE,guide=F) + 
-        scale_shape_manual(values = list(Sim = 17,Não = 16),
-                           name = "A mudança para este valor é estatisticamente significante?") +
+        scale_shape_manual(values = yes_no_list,
+                           name = website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
-        ggtitle("Progresso dos partidos para cada sondagem") +
-        theme(legend.position = "bottom")
+        ggtitle(website_explanations$party_progress) +
+        theme(legend.position = "bottom") +
+        xlab(website_legends$date) + 
+        ylab(website_legends$proportion)
+    
     if (log_plot_all == T) {
         poll_plot_all <- poll_plot_all + 
             scale_y_continuous(trans='log10')
@@ -147,56 +160,59 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
                                rel_heights = c(0.9,0.1),
                                ncol=1)
     poll_plot_bars <- values_for_plot %>% 
-        ggplot(aes(x = Partido,y = Proporção,
-                   ymin = Mínimo,ymax = Máximo,
-                   fill = Partido)) + 
+        ggplot(aes(x = PoliticalParty,y = Proportion,
+                   ymin = Minimum,ymax = Maximum,
+                   fill = PoliticalParty)) + 
         geom_bar(stat = "identity",
                  position = "dodge",
                  color = 'black',
                  size = 0.2) + 
-        geom_text(aes(label = round(Proporção,2),y = Máximo),
+        geom_text(aes(label = round(Proportion,2),y = Maximum),
                   vjust = -0.4,size = 1.4) +
         geom_errorbar(colour = 'black',size=0.2,width = 0.5) + 
         facet_wrap(~ plot_facet,ncol = 3,scales = "free_x") + 
         theme_minimal(base_size = 7) +
         scale_fill_manual(values = PALETTE,guide = F) + 
         scale_y_continuous(expand = c(0,0.05)) +
-        ggtitle("Comparação entre partidos por sondagem") + 
+        ggtitle(website_explanations$compare_parties) + 
         ggpubr::rotate_x_text() + 
         theme(legend.position = "bottom",
               panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank())
+              panel.grid.major.x = element_blank()) +
+        xlab(website_legends$political_party) + 
+        ylab(website_legends$proportion)
+    
     poll_plot_variations <- values_for_plot %>%
-        group_by(Partido) %>%
-        arrange(Data) %>%
-        mutate(var = c(NA,diff(Proporção)),
-               var_error = sqrt(Erro^2 + c(NA,Erro[-1])^2)) %>%
-        mutate(plot_facet = reorder(gsub(' ','\n',plot_facet),as.Date(Data))) %>% 
+        group_by(PoliticalParty) %>%
+        arrange(Date) %>%
+        mutate(var = c(NA,diff(Proportion)),
+               var_error = sqrt(Error^2 + c(NA,Error[-1])^2)) %>%
+        mutate(plot_facet = reorder(gsub(' ','\n',plot_facet),as.Date(Date))) %>% 
         subset(!is.na(var)) %>% 
-        ggplot(aes(x = Data,y = var,ymin = var - var_error,ymax = var + var_error,
-                   colour = Partido)) + 
+        ggplot(aes(x = Date,y = var,ymin = var - var_error,ymax = var + var_error,
+                   colour = PoliticalParty)) + 
         geom_hline(yintercept = 0,size = 0.2,alpha = 1) +
         geom_point(size = 0.2,
                    alpha=0.5) +
         geom_linerange(size=0.1,
                        alpha = 0.5) + 
-        facet_wrap(~ Partido,ncol = 1,scales = "free_x") + 
+        facet_wrap(~ PoliticalParty,ncol = 1,scales = "free_x") + 
         theme_minimal(base_size = 7) +
         scale_colour_manual(values = PALETTE,guide = F) + 
         scale_x_date(date_labels = "%b\n%Y") + 
         scale_y_continuous(breaks = seq(-1,1,by=0.1),expand = c(0.03,0.03)) +
-        ggtitle("Variação observada entre sondagens") + 
+        ggtitle(website_explanations$variation_observed) + 
         ggpubr::rotate_x_text() + 
         theme(legend.position = "bottom",
               panel.grid = element_blank(),
               panel.border = element_rect(fill=NA,colour='black',size=0.2),
               axis.ticks.x = element_line(size = 0.2),
               axis.text = element_text(size = 4)) + 
-        xlab("Sondagens") + 
-        ylab("Variação")
+        xlab(website_legends$poll_id) + 
+        ylab(website_legends$variation)
     
     poll_plot_streamgraph <- streamgraph(values_for_plot,
-                                         "Partido","Proporção", "Data", 
+                                         "PoliticalParty","Proportion","Date", 
                                          interactive=TRUE) %>% 
         sg_axis_x(4, "month","%b\n%Y") %>% 
         sg_fill_manual(values = PALETTE)
@@ -210,91 +226,97 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
 
 make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
     values_for_plot <- values_for_plot %>%
-        group_by(Partido) %>% 
-        arrange(Partido,Data) %>% 
-        mutate(PrevP = c(NA,Proporção[-length(Proporção)]),
+        group_by(PoliticalParty) %>% 
+        arrange(PoliticalParty,Date) %>% 
+        mutate(PrevP = c(NA,Proportion[-length(Proportion)]),
                PrevT = c(NA,Total[-length(Total)])) %>% 
         rowwise() %>%
         mutate(p.val.prev = statistical_test(
-            Proporção,
+            Proportion,
             PrevP,
             Total,
             PrevT
         )) %>% 
-        mutate(Significante = ifelse(p.val.prev < 0.05,"Sim","Não")) %>%
-        mutate(Significante = ifelse(is.na(Significante),"Não",Significante))
+        mutate(Significante = ifelse(p.val.prev < 0.05,website_legends$yes,website_legends$no)) %>%
+        mutate(Significante = ifelse(is.na(Significante),website_legends$no,Significante))
 
     smooth_values_for_plot <- lapply(
-        unique(values_for_plot$Partido),
+        unique(values_for_plot$PoliticalParty),
         FUN = function(x) {
             tmp <- values_for_plot %>% 
-                subset(Partido == x) %>%
-                subset(!is.na(Proporção))
-            values <- tmp$Proporção
-            dates <- tmp$Data
+                subset(PoliticalParty == x) %>%
+                subset(!is.na(Proportion))
+            values <- tmp$Proportion
+            dates <- tmp$Date
             smooth_values <- kalman_filter(values,dates)
             data.frame(
                 SmoothValues = smooth_values$values[-1],
-                Data = smooth_values$dates,
-                Partido = x
+                Date = smooth_values$dates,
+                PoliticalParty = x
             ) %>%
-                mutate(Data = as.Date(Data)) %>% 
-                subset(Data >= min(tmp$Data)) %>% 
+                mutate(Date = as.Date(Date)) %>% 
+                subset(Date >= min(tmp$Date)) %>% 
                 return
         }) %>%
         do.call(what = rbind) %>%
         as.data.frame() %>%
-        mutate(Data = as.Date(Data))
+        mutate(Date = as.Date(Date))
     
     poll_plot <- values_for_plot %>% 
-        subset(!is.na(Proporção)) %>% 
-        ggplot(aes(x = Data,y = Proporção,
-                   colour = Partido,fill = Partido,
-                   group = Partido)) + 
+        subset(!is.na(Proportion)) %>% 
+        ggplot(aes(x = Date,y = Proportion,
+                   colour = PoliticalParty,fill = PoliticalParty,
+                   group = PoliticalParty)) + 
         geom_point(size = 0.4,aes(shape = Significante),alpha = 0.45) + 
         geom_line(size = 0.4,
                   data = smooth_values_for_plot,
                   inherit.aes = F,
-                  aes(x = Data,
-                      colour = Partido,
+                  aes(x = Date,
+                      colour = PoliticalParty,
                       y = SmoothValues),
                   na.rm = T) +
-        facet_wrap(~ Partido,ncol = 3) + 
+        facet_wrap(~ PoliticalParty,ncol = 3) + 
         theme_minimal(base_size = 7) + 
         scale_colour_manual(values = PALETTE,guide=F) + 
         scale_fill_manual(values = PALETTE,guide=F) + 
-        scale_shape_manual(values = list(Sim = 17,Não = 16),
-                           name = "A mudança para este valor é estatisticamente significante?") +
+        scale_shape_manual(values = yes_no_list,
+                           name =  website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
-        ggtitle("Progresso dos partidos para cada sondagem") + 
+        ggtitle(website_explanations$party_progress) + 
         theme(legend.position = "bottom",
-              panel.grid.minor.y = element_blank())
+              panel.grid.minor.y = element_blank()) +
+        xlab(website_legends$date) +
+        ylab(website_legends$proportion)
+    
     if (log_plot == T) {
         poll_plot <- poll_plot + 
             scale_y_continuous(trans='log10')
     }
     
     poll_plot_all <- values_for_plot %>% 
-        subset(!is.na(Proporção)) %>% 
-        ggplot(aes(x = Data,y = Proporção,
-                   colour = Partido,fill = Partido,
-                   group = Partido)) + 
+        subset(!is.na(Proportion)) %>% 
+        ggplot(aes(x = Date,y = Proportion,
+                   colour = PoliticalParty,fill = PoliticalParty,
+                   group = PoliticalParty)) + 
         geom_point(size = 0.5,aes(shape = Significante),alpha = 0.4) + 
         geom_line(size = 0.6,
                   data = smooth_values_for_plot,
                   inherit.aes = F,
-                  aes(x = Data,
-                      colour = Partido,
+                  aes(x = Date,
+                      colour = PoliticalParty,
                       y = SmoothValues),
                   na.rm = T) +
         theme_minimal(base_size = 7) + 
         scale_colour_manual(values = PALETTE,name = NULL) + 
         scale_fill_manual(values = PALETTE,guide=F) + 
-        scale_shape_manual(values = list(Sim = 17,Não = 16),
-                           name = "A mudança para este valor é estatisticamente significante?") +
+        scale_shape_manual(values = yes_no_list,
+                           name = website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
-        ggtitle("Progresso dos partidos para cada sondagem") +
-        theme(legend.position = "bottom")
+        ggtitle(website_explanations$party_progress) +
+        theme(legend.position = "bottom") +
+        xlab(website_legends$date) +
+        ylab(website_legends$proportion)
+    
     if (log_plot_all == T) {
         poll_plot_all <- poll_plot_all + 
             scale_y_continuous(trans='log10')
@@ -309,7 +331,7 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
                                ncol=1)
     
     poll_plot_streamgraph <- streamgraph(smooth_values_for_plot,
-                                         "Partido","SmoothValues", "Data", 
+                                         "PoliticalParty","SmoothValues", "Date", 
                                          interactive=TRUE) %>% 
         sg_axis_x(4, "month","%b\n%Y") %>% 
         sg_fill_manual(values = PALETTE)
@@ -321,19 +343,19 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
 }
 
 select_values_for_plot <- function(values_for_plot) {
-    if (length(unique(values_for_plot$Partido)) > 12) {
+    if (length(unique(values_for_plot$PoliticalParty)) > 12) {
         values_for_plot <- values_for_plot %>% 
-            group_by(Partido) %>% 
-            mutate(freq = length(unique(Data)))
+            group_by(PoliticalParty) %>% 
+            mutate(freq = length(unique(Date)))
         if (max(values_for_plot$freq) > 1) { 
             values_for_plot <- values_for_plot %>%
                 subset(freq > 1)
         }
     }
-    if (length(unique(values_for_plot$Partido)) > 12) {
+    if (length(unique(values_for_plot$PoliticalParty)) > 12) {
         values_for_plot <- values_for_plot %>% 
-            group_by(Partido) %>% 
-            mutate(M = max(Proporção))
+            group_by(PoliticalParty) %>% 
+            mutate(M = max(Proportion))
         if (max(values_for_plot$freq) > 1) { 
             values_for_plot <- values_for_plot %>%
                 subset(M >= sort(M,decreasing=T)[12])
@@ -362,9 +384,9 @@ shinyServer(function(input, output) {
                 C = max(0,sprintf("%.2f%%",input$calc_proportion + err * 100))
             )
             colnames(output_table) <- c(
-                "Erro",
-                "Intervalo (mínimo)",
-                "Intervalo (máximo)"
+                website_legends$error,
+                website_legends$interval_minimum,
+                website_legends$interval_maximum
             )
             output$calc_output <- renderTable(
                 output_table
@@ -401,18 +423,19 @@ shinyServer(function(input, output) {
                 C = c(max(sprintf("%.2f%%",input$calc_proportion_1 + err_1 * 100),0),
                       max(sprintf("%.2f%%",input$calc_proportion_2 + err_2 * 100),0))
             )
-            colnames(output_table) <- c("ID","Erro","Intervalo (mínimo)","Intervalo (máximo)")
+            colnames(output_table) <- c("ID",website_legends$error,
+                                        "interval_min","interval_max")
             output$calc_output_compare <- renderTable(output_table)
             P <- ggplot(mutate(output_table,P = c(input$calc_proportion_1,input$calc_proportion_2)),
                         aes(x = ID,y = P,
-                            ymin = as.numeric(gsub("%","",`Intervalo (mínimo)`)),
-                            ymax = as.numeric(gsub("%","",`Intervalo (máximo)`)))) + 
+                            ymin = as.numeric(gsub("%","",interval_min)),
+                            ymax = as.numeric(gsub("%","",interval_max)))) + 
                 geom_point() + 
                 geom_linerange() +
                 theme_minimal() +
                 xlab("") + 
-                ylab("Percentagem (%)") +
-                ggtitle(sprintf("diferença das proporções entre %.2f%% e %.2f%%",dr[1]*100,dr[2]*100),
+                ylab(website_legends$proportion_percent) +
+                ggtitle(sprintf("dif. prop = [%.2f%%,%.2f%%]",dr[1]*100,dr[2]*100),
                         sprintf("p-value = %.5f",p_value))
             output$compare_plot <- renderPlot(P)
         }
@@ -422,44 +445,44 @@ shinyServer(function(input, output) {
     download_pt_polls()
     values <- reactiveValues()
     values$dt <- data.frame(
-        Partido = character(0),
+        PoliticalParty = character(0),
         Total = numeric(0),
-        Data = character(0),
-        Sondagem = character(0),
-        Proporção = double(0),
-        Mínimo = numeric(0),
-        Máximo = numeric(0),
-        Erro = numeric(0)
+        Date = character(0),
+        PollID = character(0),
+        Proportion = double(0),
+        Minimum = numeric(0),
+        Maximum = numeric(0),
+        Error = numeric(0)
     )
     df <- load_pt_polls() %>% 
-        mutate(Erro = round(qnorm(0.95)*sqrt(Proporção*(1-Proporção)/Total),3)) %>%
-        mutate(Mínimo = Proporção - Erro) %>%
-        mutate(Máximo = Proporção + Erro) %>%
+        mutate(Error = round(qnorm(0.95)*sqrt(Proportion*(1-Proportion)/Total),3)) %>%
+        mutate(Minimum = Proportion - Error) %>%
+        mutate(Maximum = Proportion + Error) %>%
         select(
-            Partido,Total,Data,Sondagem,Proporção,Mínimo,Máximo,Erro
+            PoliticalParty,Total,Date,PollID,Proportion,Minimum,Maximum,Error
         )
     isolate(values$dt <- bind_rows(values$dt,df))
     isolate({
         values_for_plot <- values$dt %>% 
-            mutate(Data = as.Date(Data),
-                   Proporção = as.numeric(Proporção),
-                   Mínimo = as.numeric(Mínimo),
-                   Máximo = as.numeric(Máximo)) %>% 
-            mutate(Partido = reorder(Partido,Proporção)) %>% 
-            mutate(plot_facet = sprintf('%s (%s)',Sondagem,Data)) %>%
-            mutate(plot_facet = reorder(plot_facet,Data))
+            mutate(Date = as.Date(Date),
+                   Proportion = as.numeric(Proportion),
+                   Minimum = as.numeric(Minimum),
+                   Maximum = as.numeric(Maximum)) %>% 
+            mutate(PoliticalParty = reorder(PoliticalParty,Proportion)) %>% 
+            mutate(plot_facet = sprintf('%s (%s)',PollID,Date)) %>%
+            mutate(plot_facet = reorder(plot_facet,Date))
         
         values_for_plot <- select_values_for_plot(values_for_plot)
         plots <- make_plots(values_for_plot)
         heights <- list(
             poll_plot = min(
-                (floor(length(unique(values_for_plot$Partido)) / 3)+1) * 200),
+                (floor(length(unique(values_for_plot$PoliticalParty)) / 3)+1) * 200),
             poll_plot_all = 700,
             poll_plot_bars = min(
-                (floor(length(unique(paste(values_for_plot$Sondagem,
-                                           values_for_plot$Data))) / 3)+1) * 200)+100,
+                (floor(length(unique(paste(values_for_plot$PollID,
+                                           values_for_plot$Date))) / 3)+1) * 200)+100,
             poll_plot_variations = min(
-                (floor(length(unique(values_for_plot$Partido)) / 3)+1) * 150)
+                (floor(length(unique(values_for_plot$PoliticalParty)) / 3)+1) * 150)
         )
         plots <- make_plots(values_for_plot)
         output$poll_plot <- renderPlot(
@@ -484,24 +507,25 @@ shinyServer(function(input, output) {
     observeEvent(input$csv_file,{
         df <- read.csv(input$csv_file$datapath,header = T) %>% 
             as.data.frame()
-        colnames(df) <- c("Partido","Total","Data","Sondagem","Proporção")
+        colnames(df) <- c("PoliticalParty","Total",
+                          "Date","PollID","Proportion")
         df <- df %>% 
-            mutate(Erro = qnorm(input$confidence/100)*sqrt(Proporção*(1-Proporção)/Total)) %>%
-            mutate(Mínimo = Proporção - Erro) %>%
-            mutate(Máximo = Proporção + Erro) %>%
+            mutate(Error = qnorm(input$confidence/100)*sqrt(Proportion*(1-Proportion)/Total)) %>%
+            mutate(Minimum = Proportion - Error) %>%
+            mutate(Maximum = Proportion + Error) %>%
             select(
-                Partido,Total,Data,Sondagem,Proporção,Mínimo,Máximo,Erro
+                PoliticalParty,Total,Date,PollID,Proportion,Minimum,Maximum,Error
             )
         values$dt <- bind_rows(values$dt,df)
         isolate(values$dt <- values$dt %>% distinct)
     })
     observeEvent(input$confidence,{
         df <- values$dt %>%
-            mutate(Erro = round(
-                qnorm(input$confidence/100)*sqrt(Proporção*(1-Proporção)/Total),
+            mutate(Error = round(
+                qnorm(input$confidence/100)*sqrt(Proportion*(1-Proportion)/Total),
                 3)) %>%
-            mutate(Mínimo = Proporção - Erro,
-                   Máximo = Proporção + Erro)
+            mutate(Minimum = Proportion - Error,
+                   Maximum = Proportion + Error)
         values$dt <- df
     })
     
@@ -525,14 +549,14 @@ shinyServer(function(input, output) {
     })
     observeEvent(input$clear,{
         values$dt <- data.frame(
-            Partido = character(0),
+            PoliticalParty = character(0),
             Total = numeric(0),
-            Data = character(0),
-            Sondagem = character(0),
-            Proporção = double(0),
-            Mínimo = numeric(0),
-            Máximo = numeric(0),
-            Erro = numeric(0)
+            Date = character(0),
+            PollID = character(0),
+            Proportion = double(0),
+            Minimum = numeric(0),
+            Maximum = numeric(0),
+            Error = numeric(0)
         )
         output$poll_plot_bars <- renderPlot(ggplot()+theme_minimal())
         output$poll_plot_all <- renderPlot(ggplot()+theme_minimal())
@@ -547,25 +571,25 @@ shinyServer(function(input, output) {
         },{
         isolate({
             values_for_plot <- values$dt %>% 
-                mutate(Data = as.Date(Data),
-                       Proporção = as.numeric(Proporção),
-                       Mínimo = as.numeric(Mínimo),
-                       Máximo = as.numeric(Máximo)) %>% 
-                mutate(Partido = reorder(Partido,Proporção)) %>% 
-                mutate(plot_facet = sprintf('%s (%s)',Sondagem,Data)) %>%
-                mutate(plot_facet = reorder(plot_facet,Data))
+                mutate(Date = as.Date(Date),
+                       Proportion = as.numeric(Proportion),
+                       Minimum = as.numeric(Minimum),
+                       Maximum = as.numeric(Maximum)) %>% 
+                mutate(PoliticalParty = reorder(PoliticalParty,Proportion)) %>% 
+                mutate(plot_facet = sprintf('%s (%s)',PollID,Date)) %>%
+                mutate(plot_facet = reorder(plot_facet,Date))
             
             values_for_plot <- select_values_for_plot(values_for_plot)
             if (nrow(values_for_plot) > 0) {
                 heights <- list(
                     poll_plot = min(
-                        (floor(length(unique(values_for_plot$Partido)) / 3)+1) * 200),
+                        (floor(length(unique(values_for_plot$PoliticalParty)) / 3)+1) * 200),
                     poll_plot_all = 700,
                     poll_plot_bars = min(
-                        (floor(length(unique(paste(values_for_plot$Sondagem,
-                                                   values_for_plot$Data))) / 3)+1) * 200)+100,
+                        (floor(length(unique(paste(values_for_plot$PollID,
+                                                   values_for_plot$Date))) / 3)+1) * 200)+100,
                     poll_plot_variations = min(
-                        (floor(length(unique(values_for_plot$Partido)) / 1)+1) * 200)
+                        (floor(length(unique(values_for_plot$PoliticalParty)) / 1)+1) * 200)
                 )
                 plots <- make_plots(values_for_plot,input$log_plot,input$log_plot_all)
                 output$poll_plot_bars <- renderPlot(
@@ -629,44 +653,44 @@ shinyServer(function(input, output) {
     
     observeEvent(input$collapsable_menu,{
         complete_values <- values$dt %>% 
-            group_by(Partido) %>% 
-            arrange(Partido,Data) %>% 
-            mutate(PrevP = c(NA,Proporção[-length(Proporção)]),
+            group_by(PoliticalParty) %>% 
+            arrange(PoliticalParty,Date) %>% 
+            mutate(PrevP = c(NA,Proportion[-length(Proportion)]),
                    PrevT = c(NA,Total[-length(Total)])) %>% 
             rowwise() %>%
             mutate(`p-value para ponto anterior` = statistical_test(
-                Proporção,
+                Proportion,
                 PrevP,
                 Total,
                 PrevT
             )) %>% 
             mutate(Significante = ifelse(`p-value para ponto anterior` < 0.05,
-                                         "Sim","Não")) %>%
+                                         website_legends$yes,website_legends$yes)) %>%
             mutate(Significante = ifelse(is.na(Significante),
-                                         "Não",Significante)) %>%
-            group_by(Partido) %>%
-            arrange(Data) %>%
-            mutate(Variação = c(NA,diff(Proporção)),
-                   `Erro na variação` = sqrt(Erro^2 + c(NA,Erro[-1])^2)) %>%
+                                         website_legends$no,Significante)) %>%
+            group_by(PoliticalParty) %>%
+            arrange(Date) %>%
+            mutate(Variação = c(NA,diff(Proportion)),
+                   VariationError = sqrt(Error^2 + c(NA,Error[-1])^2)) %>%
             select(-PrevP,-PrevT)
         output$download_simple <- downloadHandler(
-            filename = function() {"sondagens_simples.csv"},
+            filename = function() {"polls_simplified.csv"},
             content = function(file) {
                 write.csv(select(
                     values$dt,
-                    Partido,Total,Data,Sondagem,Proporção), 
+                    PoliticalParty,Total,Date,PollID,Proportion), 
                     fileEncoding = "UTF-8",file, row.names = FALSE)
             }
         )
         output$download_with_error <- downloadHandler(
-            filename = function() {"sondagens_com_erros.csv"},
+            filename = function() {"polls_with_errors.csv"},
             content = function(file) {
                 write.csv(values$dt, file,
                           fileEncoding = "UTF-8", row.names = FALSE)
             }
         )
         output$download_complete <- downloadHandler(
-            filename = function() {"sondagens_completo.csv"},
+            filename = function() {"polls_complete.csv"},
             content = function(file) {
                 write.csv(complete_values, 
                           fileEncoding = "UTF-8",

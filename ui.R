@@ -29,7 +29,7 @@ source('text_pt.R')
 shinyUI(fluidPage(
     tags$head(tags$script(HTML(jscode))),
     # Application title
-    titlePanel(website_legends$title,windowTitle = 'São sondagens, senhor'),
+    titlePanel(website_legends$title,windowTitle = website_legends$title),
     # Sidebar with a slider input for number of bins
     sidebarLayout(
         sidebarPanel(
@@ -48,99 +48,101 @@ shinyUI(fluidPage(
                     style = "primary",
                     website_legends$add_data_manual,
                     tagAppendAttributes(
-                        textInput(inputId = "party",label = "Partido político"),
+                        textInput(inputId = "party",label = website_legends$political_party),
                         `data-proxy-click` = "add"
                     ),
                     tagAppendAttributes(
-                        numericInput(inputId = "prop",label = "Proporção",value = 0),
+                        numericInput(inputId = "prop",label = website_legends$proportion,value = 0),
                         `data-proxy-click` = "add"
                     ),tagAppendAttributes(
-                        numericInput(inputId = 'total',label = 'Total de sondados',value = 0),
+                        numericInput(inputId = 'total',label = website_legends$polled_total,value = 0),
                         `data-proxy-click` = "add"
                     ),
                     tagAppendAttributes(
-                        dateInput(inputId = "poll_date",label = "Data"),
+                        dateInput(inputId = "poll_date",label = website_legends$date),
                         `data-proxy-click` = "add"
                     ),
                     tagAppendAttributes(
-                        textInput(inputId = "poll_id",label = "Sondagem"),
+                        textInput(inputId = "poll_id",label = website_legends$poll_id),
                         `data-proxy-click` = "add"
                     ),
-                    actionButton(inputId = 'add',label = "Acrescentar")),
+                    actionButton(inputId = 'add',label = website_legends$add)),
                 bsCollapsePanel(
                     style = "primary",
                     "Apagar dados",
                     tagAppendAttributes(
                         textInput(inputId = "rows_to_delete",
-                                  label = "Linhas a apagar (separadas por vírgulas)"),
+                                  label = website_legends$delete_rows_comma_separated),
                         `data-proxy-click` = "delete_rows"
                     ),
-                    actionButton(inputId = "delete_rows",label = "Apagar"),
-                    actionButton(inputId = "clear",label = "Apagar tudo",
+                    actionButton(inputId = "delete_rows",label = website_legends$delete),
+                    actionButton(inputId = "clear",label = website_legends$delete_all,
                                  style="color:#ffffff; background-color: #B73239")),
                 bsCollapsePanel(
                     style = "primary",
-                    "Download dos dados",
+                    website_legends$download_data_title,
                     div(
                         align = "center",
-                        downloadButton("download_simple", "Simplificado"),
-                        downloadButton("download_with_error", "Com erros calculados"),
-                        downloadButton("download_complete", "Completo")
+                        downloadButton("download_simple", website_legends$simplified),
+                        downloadButton("download_with_error", website_legends$error_calculated),
+                        downloadButton("download_complete", website_legends$complete)
                     )
                     ),
                 bsCollapsePanel(
                     style = "primary",
-                    "Confiança",
+                    website_legends$confidence,
                     sliderInput("confidence",
-                                "Confiança (para CI):",
+                                website_legends$confidence_for_ci,
                                 min = 50, max = 100,
                                 post = '%',
                                 #step = 1,
                                 value = 95)),
                 bsCollapsePanel(
                     style = "primary",
-                    "Aproximação (filtro de Kalman)",
+                    website_legends$approximation_kalman,
                     website_explanations$kalman_explanation_text,
-                    prettySwitch("kalman_trigger","Ativar visualização")),
+                    prettySwitch("kalman_trigger",website_legends$activate_visualization_kalman)),
                 bsCollapsePanel(
                     style = "info",
-                    "Ajuda",website_explanations$help_text),
+                    website_legends$help,website_explanations$help_text),
                 bsCollapsePanel(
                     style = "info",
-                    "Significância estatística?",
+                    website_legends$statistical_significance,
                     website_explanations$statistical_significance_text),
                 bsCollapsePanel(
                     style = "info",
-                    "Intervalos e confiança - mas porquê?",
+                    website_legends$intervals_and_confidence,
                     website_explanations$intervals_text),
                 bsCollapsePanel(
                   style = "primary",
                   website_legends$calculate_error,
-                  numericInput("calc_proportion","Proporção (%)",5,min = 0,max = 100,step = 1),
-                  numericInput("calc_sample_size","Tamanho da amostra",100,min = 1),
-                  numericInput("calc_confidence","Confiança (%)",95,min = 0,max = 100,step = 1),
+                  numericInput("calc_proportion",website_legends$proportion_percent,5,
+                               min = 0,max = 100,step = 1),
+                  numericInput("calc_sample_size",website_legends$sample_size,100,min = 1),
+                  numericInput("calc_confidence",website_legends$confidence_percent,95,min = 0,max = 100,step = 1),
                   tableOutput("calc_output")),
                 bsCollapsePanel(
                   style = "primary",
                   website_legends$compare_proportions,
-                  p("A diferença entre as duas probabilidades tem significância estatística se o valor-p ",
-                    " for inferior a 0.05 ou o intervalo da diferença das proporções não contiver o 0. ",
-                    "Este teste não é válido para amostras pequenas (<30)."),
+                  website_explanations$compare_proportions,
                   fluidRow(
                     column(
                       width = 6,
-                      numericInput("calc_proportion_1","Proporção 1 (%)",5,min = 0,max = 100,step = 1)),
+                      numericInput("calc_proportion_1",website_legends$proportion_1_percent,5,
+                                   min = 0,max = 100,step = 1)),
                     column(
                       width = 6,
-                      numericInput("calc_proportion_2","Proporção 2 (%)",5,min = 0,max = 100,step = 1))),
+                      numericInput("calc_proportion_2",website_legends$proportion_1_percent,5,
+                                   min = 0,max = 100,step = 1))),
                   fluidRow(
                     column(
                       width = 6,
-                      numericInput("calc_sample_size_1","Tamanho da amostra",100,min = 1)),
+                      numericInput("calc_sample_size_1",website_legends$sample_size,100,
+                                   min = 1)),
                     column(
                       width = 6,
-                      numericInput("calc_confidence_2","Confiança (%)",95,min = 0,max = 100,step = 1))),
-                  actionButton("compare_proportions",label = "Comparar"),
+                      numericInput("calc_confidence_2",website_legends$confidence_percent,95,min = 0,max = 100,step = 1))),
+                  actionButton("compare_proportions",label = website_legends$compare_proportions),
                   tableOutput("calc_output_compare"),
                   plotOutput("compare_plot"))
                 ),
@@ -167,7 +169,7 @@ shinyUI(fluidPage(
                     tabPanel(website_legends$streamgraph,
                              br(),streamgraphOutput("poll_plot_streamgraph"))),
                 navbarMenu(website_legends$code,
-                           tabPanel(a("Github",href = ""))),
+                           tabPanel(a("Github",href = "https://github.com/josegcpa/sondagens"))),
                 navbarMenu(website_legends$contact,
                            tabPanel(a("E-mail",href = "mailto:jose.gcp.almeida@gmail.com")))
         ))
