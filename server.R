@@ -15,16 +15,16 @@ PALETTE <- c("#332288","#6699CC","#88CCEE","#44AA99","#117733",
 RES <- 200
 
 CONVERSION_LIST <- list(
-    Partido.Social.Democrata = 'PSD',
-    Partido.Socialista = 'PS',
-    Bloco.de.Esquerda = 'BE',
-    CDS.Partido.Popular = 'CDS-PP',
-    Coligação.Democrática.Unitária = 'CDU',
-    Pessoas.Animais.Natureza = 'PAN',
-    LIVRE = 'LIVRE',
-    Iniciativa.Liberal = 'IL',
-    Aliança = 'A',
-    Chega = 'CH',
+    PSD = 'PSD',
+    PS = 'PS',
+    BE = 'BE',
+    CDS.PP = 'CDS-PP',
+    CDU = 'CDU',
+    PAN = 'PAN',
+    L = 'LIVRE',
+    IL = 'IL',
+    A = 'A',
+    CH = 'CH',
     Other = 'Outros'
 )
 
@@ -35,7 +35,7 @@ names(yes_no_list) <- c(
 )
 
 download_pt_polls <- function() {
-    data_url <- 'https://filipvanlaenen.github.io/eopaod/pt.csv'
+    data_url <- 'https://storage.googleapis.com/asapop-website-20220812/_csv/pt.csv'
     download.file(data_url, "data/pt.csv")
 }
 
@@ -53,6 +53,11 @@ load_pt_polls <- function() {
         mutate(Proportion = gsub('%','',Proportion) %>% 
                    as.character %>%
                    as.numeric) %>%
+        mutate(Total = Total %>% 
+               as.character %>%
+               as.numeric) %>%
+        subset(!is.na(Proportion)) %>%
+        subset(!is.na(Total)) %>%
         mutate(Proportion = Proportion / 100)
     return(tmp)
 }
@@ -62,7 +67,7 @@ kalman_filter <- function(values,dates) {
     irregular_time_series <- irts(dates,values)
     inter_ts <- approx.irts(irregular_time_series,
                             time = seq(min(dates),max(dates),by = 'months'))
-    inter_values <- ts(inter_ts$value,frequency = 0.25)
+    inter_values <- ts(inter_ts$value,frequency = 1)
 
     dlm_build <- function(par) {
         dlmModPoly(1,dV = par[1],dW = par[2])
@@ -120,7 +125,8 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
         scale_x_date(date_labels = "%b\n%Y") + 
         ggtitle(website_explanations$party_progress) + 
         theme(legend.position = "bottom",
-              panel.grid.minor.y = element_blank()) +
+              panel.grid.minor.y = element_blank(),
+              legend.key.size = unit(0.5,"line")) +
         xlab(website_legends$date) + 
         ylab(website_legends$proportion)
     
@@ -146,7 +152,8 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
                            name = website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
         ggtitle(website_explanations$party_progress) +
-        theme(legend.position = "bottom") +
+        theme(legend.position = "bottom",
+              legend.key.size = unit(0.5,"line")) +
         xlab(website_legends$date) + 
         ylab(website_legends$proportion)
     
@@ -178,7 +185,8 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
         ggpubr::rotate_x_text() + 
         theme(legend.position = "bottom",
               panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank()) +
+              panel.grid.major.x = element_blank(),
+              legend.key.size = unit(0.5,"line")) +
         xlab(website_legends$political_party) + 
         ylab(website_legends$proportion)
     
@@ -207,7 +215,8 @@ make_plots <- function(values_for_plot,log_plot=T,log_plot_all=T) {
               panel.grid = element_blank(),
               panel.border = element_rect(fill=NA,colour='black',size=0.2),
               axis.ticks.x = element_line(size = 0.2),
-              axis.text = element_text(size = 4)) + 
+              axis.text = element_text(size = 4),
+              legend.key.size = unit(0.5,"line")) + 
         xlab(website_legends$poll_id) + 
         ylab(website_legends$variation)
     
@@ -284,7 +293,8 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
         scale_x_date(date_labels = "%b\n%Y") + 
         ggtitle(website_explanations$party_progress) + 
         theme(legend.position = "bottom",
-              panel.grid.minor.y = element_blank()) +
+              panel.grid.minor.y = element_blank(),
+              legend.key.size = unit(0.5,"line")) +
         xlab(website_legends$date) +
         ylab(website_legends$proportion)
     
@@ -313,7 +323,8 @@ make_plots_smooth <- function(values_for_plot,log_plot=F,log_plot_all=F) {
                            name = website_explanations$is_change_significant) +
         scale_x_date(date_labels = "%b\n%Y") + 
         ggtitle(website_explanations$party_progress) +
-        theme(legend.position = "bottom") +
+        theme(legend.position = "bottom",
+              legend.key.size = unit(0.5,"line")) +
         xlab(website_legends$date) +
         ylab(website_legends$proportion)
     
